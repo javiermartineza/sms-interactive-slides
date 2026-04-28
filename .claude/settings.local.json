@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(python demo_sms_cello.py)",
+      "Bash(python outputs/demo_sms_cello.py)",
+      "Bash(set PYTHONIOENCODING=utf-8)",
+      "PowerShell($env:PYTHONIOENCODING = \"utf-8\"; cd \"c:\\\\Users\\\\javie\\\\OneDrive - Universidad Católica de Chile\\\\Escritorio\\\\ClasesAnalisis\\\\generacionsenales\"; python generar_stft.py)"
+    ]
+  }
+}

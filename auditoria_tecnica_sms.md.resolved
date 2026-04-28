@@ -1,0 +1,189 @@
+# Auditoría Técnica — Slides SMS / Spectral Modeling Synthesis
+
+> **Alcance**: Se auditaron los 10 slides (JSX), el documento [contexto_teorico_sms.md](file:///c:/Users/javie/OneDrive%20-%20Universidad%20Cat%C3%B3lica%20de%20Chile/Escritorio/ClasesAnalisis/sms-slides/contexto_teorico_sms.md) y el pipeline Python [demo_sms_cello.py](file:///c:/Users/javie/OneDrive%20-%20Universidad%20Cat%C3%B3lica%20de%20Chile/Escritorio/ClasesAnalisis/generacionsenales/demo_sms_cello.py).
+
+---
+
+## 1. STFT y Peak Detection
+
+### 1.1 SlidePicketFence.jsx (Slide 02) — ✅ VÁLIDO
+
+| Aspecto | Veredicto |
+|---------|-----------|
+| Resolución `Δf = fs/N = 44100/2048` | ✅ Correcto (≈ 21.53 Hz/bin) |
+| Frecuencia de un bin: `k × BIN_RES` | ✅ Consistente con fórmula estándar `f_k = k · (f_s/N)` |
+| Error vs. bin más cercano | ✅ `abs(freq - round(freq/BIN_RES) × BIN_RES)` es correcto |
+| Envolvente Gaussiana como modelo visual | ✅ Pedagógicamente válido — modela el lóbulo principal de una Hann |
+| Picket-Fence: energía "derramada" entre bins | ✅ Explicación coherente con la literatura (Serra 1989, Smith 2011) |
+
+### 1.2 SlidePipelineSMS.jsx (Slide 06) — ✅ VÁLIDO
+
+| Aspecto | Veredicto |
+|---------|-----------|
+| Paso 1 desc: "Ventana Hann por frame → FFT → \|X(k,m)\| en dBFS" | ✅ Exacto — coincide con `compute_stft()` en Python |
+| Paso 2 desc: "Bins donde \|X(k)\| > vecinos y > umbral" | ✅ Coincide con `detect_peaks()` |
+| Paso 3 desc: "δ = ½(α−γ)/(α−2β+γ)" | ✅ Fórmula correcta |
+| Paso 4 desc: "Mayor energía primero: la Regla de Oro" | ✅ Coincide con el `argsort(mags)[::-1]` en Python |
+
+### 1.3 Cruce con Python
+
+- `compute_stft()` (L75-130): Usa `np.hanning(n_fft)`, normalización por `sum(window)/2`, magnitud `20·log10(|spec|)`. ✅ Coherente con los slides.
+- `detect_peaks()` (L165-221): Máximo local `mag[k] > mag[k-1]` AND `mag[k] > mag[k+1]` AND `mag[k] > threshold`. ✅ Coincide con la condición del contexto teórico §2.
+
+---
+
+## 2. Interpolación Parabólica
+
+### 2.1 SlideParabola.jsx (Slide 03) — ✅ VÁLIDO
+
+| Aspecto | Veredicto |
+|---------|-----------|
+| Variables α, β, γ | ✅ Asignadas al bin k−1, k, k+1 respectivamente |
+| Fórmula δ mostrada en KaTeX | ✅ `\delta = \frac{1}{2}\,\frac{\alpha - \gamma}{\alpha - 2\beta + \gamma}` — coincide con Smith (2011) y el contexto teórico |
+| Cálculo JS: `0.5 * (alpha - gamma) / (alpha - 2*beta + gamma)` | ✅ Correcto |
+| Amplitud pico: `beta - 0.25*(alpha-gamma)*delta` | ✅ Presente en código pero **no mostrada en la UI** — no es un error, solo una decisión pedagógica |
+| Parábola SVG: coeficientes `a = 0.5*(α+γ) − β`, `b = 0.5*(γ−α)`, `c = β` | ✅ Derivación correcta del sistema y(−1)=α, y(0)=β, y(+1)=γ |
+
+> [!NOTE]
+> En este slide, α, β, γ son amplitudes **lineales** (no dB), porque la envolvente Gaussiana `envelope()` opera en escala lineal. Esto es válido pedagógicamente para la intuición visual, pero difiere del contexto teórico donde se define explícitamente α = 20·log₁₀(|X[k−1]|). No es un error: el slide 03 busca la *intuición gráfica* y el slide 04 introduce la versión dB formalmente.
+
+### 2.2 SlideMath.jsx (Slide 04) — ✅ VÁLIDO
+
+| Aspecto | Veredicto |
+|---------|-----------|
+| Valores pedagógicos: α = −15 dB, β = −3 dB, γ = −6 dB | ✅ Correctos y en **escala dB** |
+| Paso 1: Sistema `y(−1) = a − b + c = α`, `y(0) = c = β`, `y(+1) = a + b + c = γ` | ✅ Algebraicamente correcto |
+| Paso 2: Derivada → `x = −b/(2a)` equivalente a la fórmula de δ | ✅ Correcto |
+| Fórmula KaTeX con sustitución numérica | ✅ `½ × (−15−(−6)) / (−15−2(−3)+(−6))` = `½ × (−9) / (−15)` = **0.3** ✅ |
+| `f_peak = (k + δ)·Δf = (20 + 0.3) × 21.53` | ✅ = **436.1 Hz** (consistente) |
+| Parábola SVG pasa exactamente por los 3 puntos [−15, −3, −6] | ✅ Mismo sistema de coeficientes que Slide 03 |
+| Colores α→naranja, β→azul, γ→verde consistentes entre Slides 03 y 04 | ✅ Identidad visual preservada |
+
+### 2.3 Cruce con Python
+
+`_parabolic_interp()` (L137-162):
+```python
+offset = 0.5 * (a - c) / denom        # δ
+mag_peak = b - 0.25 * (a - c) * offset # A_real
+```
+✅ Idéntico a las fórmulas de los slides y del contexto teórico.
+
+---
+
+## 3. Peak Tracking (McAulay-Quatieri)
+
+### 3.1 SlideTracking.jsx (Slide 05) — ✅ VÁLIDO (con una observación menor)
+
+| Aspecto | Veredicto |
+|---------|-----------|
+| Paso 1: "Ordenar tracks por magnitud ↓" | ✅ Coincide con `argsort(mags)[::-1]` en Python |
+| Paso 2: "Buscar picos dentro de ±Δf_max" | ✅ Coincide con la ventana de tolerancia del contexto teórico |
+| Paso 3: Match — "track fuerte toma P₁" | ✅ Correcto: el más fuerte tiene prioridad |
+| Paso 4: "P₁ ya tomado" — evitar robo | ✅ Correcto: `claimed` set en Python |
+| Paso 5: Death + Birth | ✅ "Amplitud decae A→0 en el tiempo" coherente con MQ |
+| Pseudocódigo lateral | ✅ Lógica correcta, highlight por paso coherente |
+| Zona de búsqueda visual ±Δf_max | ✅ `DF = 1.0` usado como ±Δf_max en la escena 3D |
+| Death tail visual: decae en el eje Y (amplitud) manteniendo Z (frecuencia) constante | ✅ Correcto: MQ interpola A→0, no mueve la frecuencia |
+
+> [!IMPORTANT]
+> **Observación sobre la prioridad de matching (no es un error, pero vale documentar):**
+> 
+> El slide dice en paso 1 "Ordenar **tracks** por magnitud", y el pseudocódigo muestra `active.sort(key=mag, desc=True)`. Sin embargo, el código Python `mq_tracking()` en realidad ordena los **picos del frame actual** (`order_cur = np.argsort(mags)[::-1]`) y luego itera sobre los picos ordenados buscando el mejor track. 
+>
+> Ambas estrategias logran el mismo objetivo (los picos fuertes tienen prioridad de asignación), pero la mecánica es ligeramente diferente:
+> - **Slide**: itera tracks ordenados → busca picos
+> - **Python**: itera picos ordenados → busca tracks
+>
+> Pedagógicamente la versión del slide es más intuitiva y **el resultado es equivalente** en la práctica porque ambas garantizan que los picos de mayor magnitud se emparejan primero. No es un error conceptual.
+
+### 3.2 SlideGlitches.jsx (Slide 10) — ✅ VÁLIDO
+
+| Aspecto | Veredicto |
+|---------|-----------|
+| Glitch 1: "Sin Memoria Temporal (Zipper Noise)" | ✅ Coincide con `broken_tracking()` en Python |
+| Código mostrado: `osciladores[i].freq = picos_actuales[i]` | ✅ Refleja la asignación directa sin continuidad de fase |
+| Glitch 2: "Sin Orden de Magnitud (Burbujeo)" | ✅ Coincide con `mq_tracking_sin_orden()` en Python |
+| Código: línea `sort()` tachada | ✅ Exactamente lo que se elimina en la variante Python |
+| Audio files: `violin_30_ROTO.wav`, `violin_30_SIN_ORDEN.wav` | ✅ Coinciden con los outputs del pipeline |
+
+---
+
+## 4. Síntesis Aditiva y Residuo
+
+### 4.1 SlideFormulaInteractiva.jsx (Slide 07) — ✅ VÁLIDO
+
+| Aspecto | Veredicto |
+|---------|-----------|
+| Fórmula KaTeX: `s(t) = ∑_{j=1}^{L} A_j(t) cos(φ_j(t))` | ✅ Consistente con el modelo determinista SMS |
+| Notación `cos(φ_j(t))` vs. Python `np.sin(phases)` | ⚠️ Ver nota abajo |
+| Slider 1–30 parciales con audio por capa | ✅ Coherente con `synths[n]` del pipeline |
+| Barras de armónicos: amplitud decae como `1/n` | ✅ Modelo pedagógico razonable para instrumento armónico |
+
+> [!NOTE]
+> **cos vs sin — no es un error:**
+> - El contexto teórico usa `cos(θ_r(t))` (notación clásica de Serra).
+> - El slide usa `cos(φ_j(t))`.
+> - El Python usa `np.sin(phases)`.
+> 
+> **Esto es perfectamente consistente.** Un coseno es un seno desfasado π/2, y dado que la fase inicial es libre (0 en el Python, arbitraria en el audio real), la elección entre sin/cos no afecta el resultado perceptual ni la corrección matemática. La convención `cos` en la notación de Serra y `sin` en la implementación es completamente estándar.
+
+### 4.2 SlideResiduoVsRuido.jsx (Slide 09) — ✅ VÁLIDO (con 1 observación)
+
+| Aspecto | Veredicto |
+|---------|-----------|
+| Panel 1: `e(t) = x(t) − s(t)` | ✅ Extracción del residuo en dominio del tiempo, coincide con Python L863 |
+| Panel 2: `R(m,k) = Mediana(|E(m,k)|) · e^{jU(−π,π)}` | ✅ Concepto correcto: suavizado espectral + fase aleatoria |
+| Panel 3: `x'(t) = s(t) + r(t)` | ✅ Reconstrucción SMS completa |
+| Texto "ecos tonales debido al desajuste de fase" | ✅ Correcto — el Python explica esto en L599-605 |
+
+> [!TIP]
+> **Observación menor sobre la fórmula del Panel 2:**
+> La fórmula `R(m,k) = Mediana(|E(m,k)|) · e^{jU(−π,π)}` es conceptualmente correcta, pero el Python implementa el filtro mediana sobre el **eje de frecuencia** con `median_filter(mag, size=(50, 1))`, no sobre el eje temporal. La fórmula del slide no explicita esto, pero tampoco lo contradice. Es una simplificación pedagógica aceptable.
+
+### 4.3 SlideSMS.jsx (Slide 08) — ✅ VÁLIDO
+
+| Aspecto | Veredicto |
+|---------|-----------|
+| "Hilos azules = trayectorias estables... síntesis aditiva" | ✅ Correcto |
+| "Picos rojos huérfanos que MQ desechó se sustraen y se modelan como ruido blanco filtrado" | ⚠️ Ver nota |
+| "Señal original ≈ Determinista + Estocástico" | ✅ Modelo SMS canónico |
+
+> [!NOTE]
+> **Precisión menor sobre "picos huérfanos":**
+> El slide dice que los picos rojos "huérfanos que MQ desechó" se modelan como ruido. Técnicamente, el residuo estocástico en SMS se obtiene restando la parte determinista sintetizada del original (`e(t) = x(t) − d(t)`), no directamente de los picos desechados. Los picos desechados por MQ (tracks cortos, picos bajo umbral) contribuyen al residuo *indirectamente*. La visualización 3D del slide es una simplificación pedagógica aceptable, pero si un alumno pregunta, vale aclarar que el residuo se extrae por sustracción temporal, no por "recolección de picos huérfanos".
+
+---
+
+## 5. Consistencia cruzada: Contexto Teórico ↔ Slides ↔ Python
+
+| Concepto | Contexto teórico | Slides | Python | ¿Consistente? |
+|----------|------------------|--------|--------|:-:|
+| Fórmula de δ | `½(α−γ)/(α−2β+γ)` | ✅ Slides 03, 04, 06 | ✅ `_parabolic_interp()` | ✅ |
+| Fórmula de f_real | `(k+δ)·fs/N` | ✅ Slides 03, 04 | ✅ `(k + offset) * freq_res` | ✅ |
+| Fórmula de A_real | `β − ¼(α−γ)δ` | ✅ Slide 03 (código), 04 (código) | ✅ `b - 0.25*(a-c)*offset` | ✅ |
+| Condición de pico | `|X[k]| > vecinos ∧ > τ` | ✅ Slide 06 texto | ✅ `detect_peaks()` | ✅ |
+| MQ: Match/Birth/Death | Descrito §3 | ✅ Slide 05, 10 | ✅ `mq_tracking()` | ✅ |
+| Residuo: `e(t) = x(t) − d(t)` | §4 | ✅ Slide 09 | ✅ L863 | ✅ |
+| Modelado: envolvente + fase random | §4 | ✅ Slide 09 | ✅ `modelar_ruido_estocastico()` | ✅ |
+| Fase continua en síntesis | §3 | ✅ Slide 07 (`cos(φ)`) | ✅ `synthesize_tracks()` | ✅ |
+
+---
+
+## 6. Resumen Ejecutivo
+
+> [!IMPORTANT]
+> ### Veredicto: **Sin errores técnicos detectados.**
+> 
+> Las ecuaciones KaTeX, la lógica visual SVG/Three.js, el texto pedagógico y el código Python son **mutuamente consistentes** y fieles a la literatura estándar (Serra 1989, McAulay-Quatieri 1986, Smith 2011).
+
+### Observaciones menores (no son errores):
+
+| # | Tipo | Ubicación | Detalle |
+|---|------|-----------|---------|
+| 1 | Diferencia de perspectiva | SlideTracking §3.1 | El slide ordena *tracks*, el Python ordena *picos*. Resultado equivalente. |
+| 2 | cos vs sin | SlideFormulaInteractiva §4.1 | Convención de notación. Resultado idéntico con fase libre. |
+| 3 | Simplificación visual | SlideSMS §4.3 | "Picos huérfanos" como proxy del residuo. Aceptable pedagógicamente. |
+| 4 | Eje del filtro mediana | SlideResiduoVsRuido §4.2 | La fórmula no explicita el eje. No contradice la implementación. |
+| 5 | Escala lineal vs dB | SlideParabola §2.1 | Slide 03 usa lineal (para intuición), Slide 04 introduce dB formalmente. Flujo pedagógico correcto. |
+
+**Ninguna de estas observaciones requiere corrección.** Son diferencias de nivel de detalle y convención, no inconsistencias técnicas.

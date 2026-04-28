@@ -1,0 +1,147 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+
+@theme {
+  --color-cream: #faf8f3;
+  --color-cream-dark: #f0ece3;
+  --color-ink: #1a1a2e;
+  --color-ink-light: #3d3d5c;
+  --color-ink-muted: #6b6b8a;
+  --color-ink-faint: #9e9eb8;
+  --color-accent-blue: #2563eb;
+  --color-accent-blue-soft: #3b82f6;
+  --color-accent-red: #c0392b;
+  --color-accent-red-soft: #e74c3c;
+  --color-accent-green: #16a34a;
+  --color-accent-gold: #d97706;
+  --color-accent-violet: #7c3aed;
+  --color-border: #e0ddd4;
+  --color-border-light: #eae7df;
+
+  --font-serif: 'Newsreader', 'Georgia', serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Menlo', monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-serif);
+  background: var(--color-cream);
+  color: var(--color-ink);
+  margin: 0;
+  padding: 0;
+  line-height: 1.7;
+}
+
+/* ─── KaTeX ─── */
+.katex { font-size: 1.15em !important; color: var(--color-ink) !important; }
+.katex-display { margin: 0.6em 0 !important; }
+
+/* ─── Animations ─── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes drawPath {
+  from { stroke-dashoffset: var(--path-length, 1000); }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes pulseSubtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.anim-fade-up {
+  animation: fadeInUp 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.anim-fade {
+  animation: fadeIn 0.5s ease both;
+}
+.anim-draw {
+  stroke-dasharray: var(--path-length, 1000);
+  stroke-dashoffset: var(--path-length, 1000);
+  animation: drawPath 1.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.anim-pulse {
+  animation: pulseSubtle 2s ease-in-out infinite;
+}
+
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.3s; }
+.delay-4 { animation-delay: 0.4s; }
+.delay-5 { animation-delay: 0.5s; }
+.delay-6 { animation-delay: 0.6s; }
+.delay-8 { animation-delay: 0.8s; }
+.delay-10 { animation-delay: 1.0s; }
+
+/* ─── Slide transitions ─── */
+.slide-enter {
+  animation: fadeInUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--color-cream); }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+
+/* ─── Math box ─── */
+.math-box {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+}
+
+/* ─── Distill-style sidenote ─── */
+.sidenote {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  color: var(--color-ink-muted);
+  line-height: 1.55;
+}
+
+/* ─── 3D canvas container ─── */
+.canvas-3d {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: #fff;
+}
+
+/* ─── Range slider thumb ─── */
+input[type='range'] { -webkit-appearance: none; appearance: none; }
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #2563eb, 0 2px 6px rgba(37,99,235,0.35);
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+input[type='range']::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 2px #2563eb, 0 3px 10px rgba(37,99,235,0.45);
+}
+input[type='range']::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #2563eb;
+  cursor: pointer;
+}
+input[type='range']:focus { outline: none; }

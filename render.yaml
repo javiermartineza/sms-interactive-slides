@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: sms-backend
+    env: python
+    buildCommand: pip install -r backend_live_synthesis/requirements.txt
+    startCommand: uvicorn backend_live_synthesis.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+
+  - type: web
+    name: sms-frontend
+    env: static
+    buildCommand: cd sms-slides && npm install && npm run build
+    staticPublishPath: sms-slides/dist
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: VITE_BACKEND_URL
+        fromService:
+          type: web
+          name: sms-backend
+          envVarKey: RENDER_EXTERNAL_URL
