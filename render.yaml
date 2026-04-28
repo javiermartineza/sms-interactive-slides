@@ -2,6 +2,7 @@ services:
   - type: web
     name: sms-backend
     env: python
+    plan: free
     buildCommand: pip install -r backend_live_synthesis/requirements.txt
     startCommand: uvicorn backend_live_synthesis.main:app --host 0.0.0.0 --port $PORT
     envVars:
