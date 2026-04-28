@@ -185,6 +185,54 @@ function DeathMark({ position, show = false }) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   WAVEFORM FADE (BIRTH / DEATH) — SVG Component for the footnote
+   ══════════════════════════════════════════════════════════════ */
+function WaveformFade({ type = 'in' }) {
+  const isFadeIn = type === 'in';
+  const color = isFadeIn ? '#16a34a' : '#ef4444';
+  const title = isFadeIn ? '✦ Fade In (Birth)' : '💀 Fade Out (Death)';
+  const desc = isFadeIn ? 'Amplitud 0 → crece gradualmente' : 'Mantiene energía → cae a 0';
+
+  const pts = 140;
+  const path = [], envUp = [], envDn = [];
+  for (let i = 0; i <= pts; i++) {
+    const x = 10 + i;
+    const progress = i / pts;
+    const envelope = isFadeIn ? progress : (1 - progress);
+    const wave = Math.sin(progress * Math.PI * 10);
+    const y = 30 + wave * 24 * envelope;
+    
+    const yu = 30 - 24 * envelope;
+    const yd = 30 + 24 * envelope;
+    path.push(`${i === 0 ? 'M' : 'L'} ${x} ${y}`);
+    envUp.push(`${i === 0 ? 'M' : 'L'} ${x} ${yu}`);
+    envDn.push(`${i === 0 ? 'M' : 'L'} ${x} ${yd}`);
+  }
+
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color }}>{title}</span>
+      <svg width="160" height="74" viewBox="0 0 160 74" className="overflow-visible">
+        {/* Ejes */}
+        <line x1="10" y1="30" x2="150" y2="30" stroke="#e0ddd4" strokeWidth="1.5" />
+        <line x1="10" y1="0" x2="10" y2="60" stroke="#e0ddd4" strokeWidth="1.5" />
+        <line x1="150" y1="0" x2="150" y2="60" stroke="#e0ddd4" strokeWidth="1.5" />
+
+        {/* Waveform & Envelopes */}
+        <path d={path.join(' ')} stroke={color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={envUp.join(' ')} stroke={color} strokeWidth="1.5" strokeDasharray="3 3" fill="none" opacity="0.4" />
+        <path d={envDn.join(' ')} stroke={color} strokeWidth="1.5" strokeDasharray="3 3" fill="none" opacity="0.4" />
+
+        {/* Labels T */}
+        <text x="10" y="72" fontSize="10" fill="#9e9eb8" textAnchor="middle" fontFamily="sans-serif">Frame n-1</text>
+        <text x="150" y="72" fontSize="10" fill="#9e9eb8" textAnchor="middle" fontFamily="sans-serif">Frame n</text>
+      </svg>
+      <span className="text-[11px] text-ink-muted mt-2 w-32 text-center leading-tight">{desc}</span>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
    3D LABEL
    ══════════════════════════════════════════════════════════════ */
 function Label3D({ position, text, color = '#fff', size = 13, show = true, bold = false }) {
@@ -247,7 +295,6 @@ function Scene({ step }) {
   const sz1Weak   = step === 4 ? 0.06 : 0;
   const arc1Op    = step >= 3 && step < 6 ? 1 : 0;
   const com1Op    = step >= 6 ? 1 : 0;          // tubo sólido FN→FN1
-  const deathTailOp = step >= 5 ? 0.7 : 0;
 
   const p1Glow = step >= 3 ? 1.5 : 0;
   const p2Glow = step >= 5 ? 1.5 : 0;
@@ -283,8 +330,7 @@ function Scene({ step }) {
       <TrackTube z={STRONG.z} y={STRONG.y} color={STRONG.color} opacity={strongOp} />
       <TrackTube z={WEAK.z}   y={WEAK.y}   color={WEAK.color}   opacity={weakOp} />
 
-      {/* ── Death tail: decaimiento A→0 en el tiempo ────────── */}
-      <DeathTail peak={WEAK} color={WEAK.color} opacity={deathTailOp} />
+      {/* ── Death Mark: marca de donde termina el track débil ── */}
       <DeathMark position={[FN, WEAK.y + 0.45, WEAK.z]} show={step >= 5} />
 
       {/* ── Frame n+1 ───────────────────────────────────────── */}
@@ -327,7 +373,7 @@ function Scene({ step }) {
       <Label3D position={[0, 3.5, 0]} text="2 · Buscar picos dentro de ±Δf_max"             color="#2563eb" size={14} bold show={step === 2} />
       <Label3D position={[0, 3.5, 0]} text="3 · MATCH — track fuerte toma P₁"               color="#16a34a" size={14} bold show={step === 3} />
       <Label3D position={[0, 3.5, 0]} text="4 · P₁ ya tomado — track débil sin candidato"   color="#ef4444" size={14} bold show={step === 4} />
-      <Label3D position={[0, 3.5, 0]} text="5 · DEATH · amplitud decae a 0 en el tiempo"    color="#7c3aed" size={14} bold show={step === 5} />
+      <Label3D position={[0, 3.5, 0]} text="5 · DEATH y BIRTH: tracks terminan y nacen"    color="#7c3aed" size={14} bold show={step === 5} />
       <Label3D position={[0, 3.5, 0]} text="6 · Trayectorias comprometidas en Frame n+1"    color="#2563eb" size={14} bold show={step === 6} />
       <Label3D position={[1, 3.5, 0]} text="7 · Frame n+2 detectado — el algoritmo repite"  color="#6b7280" size={14} bold show={step === 7} />
       <Label3D position={[1, 3.5, 0]} text="8 · Ordenar + buscar desde los 3 tracks vivos"  color="#7c3aed" size={14} bold show={step === 8} />
@@ -392,7 +438,7 @@ const STEPS = [
   { title: '4 · Robo Evitado', color: '#ef4444',
     desc: 'El track débil busca candidato, pero P₁ ya está en claimed. Sin la ordenación, lo habría robado.' },
   { title: '5 · Death & Birth', color: '#a78bfa',
-    desc: 'DEATH: amplitud decae A→0 en el tiempo (tubo naranja). P₂ y P₃, sin match previo, nacen como tracks nuevos.' },
+    desc: 'DEATH: el track naranja termina. P₂ y P₃, sin match previo, nacen como tracks nuevos (BIRTH).' },
   { title: '6 · Frame n+1 resuelto', color: '#2563eb',
     desc: 'Trayectoria azul comprometida. P₂ y P₃ son tracks nacientes. Frame n+1 pasa a ser el nuevo "Frame n".' },
   { title: '7 · Frame n+2 detectado', color: '#6b7280',
@@ -566,6 +612,20 @@ export default function SlideTracking() {
               <span>↺ Reiniciar</span>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Nota sobre el Fade-in / Fade-out */}
+      <div className={`mt-4 w-full px-6 py-5 bg-white border border-border shadow-sm rounded-xl flex flex-col md:flex-row gap-6 md:gap-12 items-center justify-between transition-opacity duration-700 ${show ? 'opacity-100 delay-500' : 'opacity-0'}`}>
+        <div className="flex-1 font-sans">
+          <p className="mb-2"><strong className="text-ink font-bold text-base tracking-wide">Evitando "Clics" Digitales</strong></p>
+          <p className="text-sm text-ink-muted leading-relaxed">
+            Para evitar discontinuidades bruscas en el audio, los tracks nunca aparecen ni desaparecen de golpe: los <b>Births</b> entran suavemente (<em>fade-in</em>) y los <b>Deaths</b> se desvanecen gradualmente (<em>fade-out</em>).
+          </p>
+        </div>
+        <div className="flex gap-8 items-center shrink-0 pr-4">
+          <WaveformFade type="out" />
+          <WaveformFade type="in" />
         </div>
       </div>
     </div>
