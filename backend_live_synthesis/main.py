@@ -361,6 +361,11 @@ def _process_voice(signal: np.ndarray, sr: int, session_dir: str) -> dict:
     _save_wav(os.path.join(session_dir, "residuo.wav"), residuo, sr)
     audio_files["residuo"] = "residuo.wav"
 
+    # SMS completo: determinista + residuo ≈ señal original reconstruida
+    sms_completo = np.clip(sintesis_total.astype(np.float32) + residuo, -1.0, 1.0)
+    _save_wav(os.path.join(session_dir, "sms_completo.wav"), sms_completo, sr)
+    audio_files["sms_completo"] = "sms_completo.wav"
+
     return {
         "n_frames": int(n_frames),
         "n_tracks": int(len(long_tracks)),

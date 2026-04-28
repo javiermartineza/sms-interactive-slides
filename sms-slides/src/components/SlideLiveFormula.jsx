@@ -4,6 +4,7 @@ import { useLiveVoice } from '../voice/LiveVoiceContext';
 
 const ACCENT = '#2563eb';
 const RES_RED = '#c0392b';
+const SMS_PURPLE = '#7c3aed';
 const FAINT = '#9ca3af';
 
 function renderLatex(tex, display = false) {
@@ -57,7 +58,7 @@ export default function SlideLiveFormula() {
   const maxParciales = ready ? Math.max(1, session.nParciales) : 30;
 
   const [value, setValue] = useState(5);
-  // 'idle' | 'partials' | 'residue'
+  // 'idle' | 'partials' | 'residue' | 'sms_completo'
   const [playMode, setPlayMode] = useState('idle');
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef(null);
@@ -91,10 +92,14 @@ export default function SlideLiveFormula() {
   // ── Fórmula KaTeX con resaltado dinámico ─────────────────────────────────
   const formulaHtml = useMemo(() => {
     const isRes = playMode === 'residue';
+    const isComplete = playMode === 'sms_completo';
     const sumColor = isRes ? FAINT : ACCENT;
-    const resColor = isRes ? RES_RED : RES_RED + '88';
-    const limit = isRes ? '\\textcolor{' + FAINT + '}{R}'
-                        : `\\textcolor{${ACCENT}}{${value}}`;
+    const resColor = (isRes || isComplete) ? RES_RED : RES_RED + '88';
+    const limit = isRes
+      ? `\\textcolor{${FAINT}}{R}`
+      : isComplete
+        ? `\\textcolor{${ACCENT}}{${maxParciales}}`
+        : `\\textcolor{${ACCENT}}{${value}}`;
     const detTerm = isRes
       ? `\\textcolor{${FAINT}}{\\hat{A}_r(t)\\,\\cos[\\hat{\\theta}_r(t)]}`
       : `\\textcolor{${ACCENT}}{\\hat{A}_r(t)\\,\\cos[\\hat{\\theta}_r(t)]}`;
@@ -102,7 +107,7 @@ export default function SlideLiveFormula() {
       `s(t) = \\textcolor{${sumColor}}{\\sum_{r=1}^{${limit}}}\\, ${detTerm}` +
       ` \\;+\\; \\textcolor{${resColor}}{e(t)}`;
     return renderLatex(tex, true);
-  }, [value, playMode]);
+  }, [value, playMode, maxParciales]);
 
   function audioForCount(n) {
     if (!ready) return null;
@@ -164,8 +169,19 @@ export default function SlideLiveFormula() {
     loadAndPlay(session.audio.residuo, 'residue');
   }
 
+  function toggleSmsCompleto() {
+    if (!ready) return;
+    if (playMode === 'sms_completo' && isPlaying) {
+      audioRef.current?.pause();
+      setIsPlaying(false);
+      return;
+    }
+    loadAndPlay(session.audio.sms_completo, 'sms_completo');
+  }
+
   const totalBars = maxParciales;
   const isResMode = playMode === 'residue';
+  const isComplete = playMode === 'sms_completo';
 
   // ────────────────────────────────────────────────────────────────────────
   return (
@@ -412,6 +428,75 @@ export default function SlideLiveFormula() {
             </div>
           </div>
 
+          {/* Botón SMS Completo */}
+          <div style={{
+            background: isComplete ? '#f5f3ff' : '#fff',
+            border: `2px solid ${isComplete ? SMS_PURPLE : '#e0ddd4'}`,
+            borderRadius: 16,
+            padding: '14px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            transition: 'background 0.25s, border-color 0.25s',
+          }}>
+            <button
+              onClick={toggleSmsCompleto}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '12px 22px',
+                borderRadius: 50,
+                border: `2.5px solid ${SMS_PURPLE}`,
+                background: SMS_PURPLE,
+                color: '#fff',
+                fontFamily: "'Inter', sans-serif",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+                letterSpacing: '0.03em',
+                boxShadow: (isPlaying && isComplete) ? `0 0 0 6px ${SMS_PURPLE}22` : 'none',
+                transition: 'box-shadow 0.25s',
+              }}
+            >
+              {(isPlaying && isComplete) ? (
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                  <rect x="1" y="1" width="4" height="10" rx="1" />
+                  <rect x="7" y="1" width="4" height="10" rx="1" />
+                </svg>
+              ) : (
+                <svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor">
+                  <path d="M1 1.2v10.6L10.2 6.5 1 1.2z" />
+                </svg>
+              )}
+              {(isPlaying && isComplete) ? 'Pausar' : 'SMS Completo'}
+            </button>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 11,
+                fontWeight: 700,
+                color: SMS_PURPLE,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+              }}>
+                s(t) — reconstrucción total
+              </div>
+              <div style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: 12,
+                color: '#6b6b8a',
+                marginTop: 2,
+                lineHeight: 1.35,
+              }}>
+                Todos los parciales + residuo estocástico.
+              </div>
+            </div>
+            {(isPlaying && isComplete) && (
+              <WaveBar active color={SMS_PURPLE} />
+            )}
+          </div>
+
           {/* Barras armónicas */}
           <div style={{
             background: '#ffffff',
@@ -441,7 +526,7 @@ export default function SlideLiveFormula() {
             }}>
               {Array.from({ length: totalBars }, (_, i) => {
                 const n = i + 1;
-                const active = n <= value && !isResMode;
+                const active = isComplete ? true : (n <= value && !isResMode);
                 const maxH = 76;
                 const h = Math.max(4, maxH / n);
                 return (
@@ -451,7 +536,7 @@ export default function SlideLiveFormula() {
                       flex: 1,
                       height: h,
                       borderRadius: '3px 3px 0 0',
-                      backgroundColor: active ? ACCENT : '#e5e7eb',
+                      backgroundColor: active ? (isComplete ? SMS_PURPLE : ACCENT) : '#e5e7eb',
                       transition: 'background-color 0.15s ease',
                       opacity: active ? 1 : 0.5,
                     }}
@@ -503,8 +588,8 @@ export default function SlideLiveFormula() {
             />
             <div style={{
               padding: '10px 18px',
-              borderTop: `2px solid ${isResMode ? '#fef2f2' : '#eff6ff'}`,
-              background: isResMode ? '#fef2f2' : '#eff6ff',
+              borderTop: `2px solid ${isResMode ? '#fef2f2' : isComplete ? '#f5f3ff' : '#eff6ff'}`,
+              background: isResMode ? '#fef2f2' : isComplete ? '#f5f3ff' : '#eff6ff',
               display: 'flex',
               alignItems: 'center',
               gap: 10,
@@ -519,12 +604,14 @@ export default function SlideLiveFormula() {
               <span style={{
                 fontFamily: "'Inter', sans-serif",
                 fontSize: 14,
-                color: isResMode ? RES_RED : ACCENT,
+                color: isResMode ? RES_RED : isComplete ? SMS_PURPLE : ACCENT,
                 fontWeight: 600,
               }}>
                 {isResMode
                   ? 'Residuo en escena: las sinusoides quedan en silencio.'
-                  : 'Trayectorias MQ — parciales de tu voz utilizados en la síntesis'}
+                  : isComplete
+                    ? 'SMS completo: todos los parciales + residuo estocástico activos.'
+                    : 'Trayectorias MQ — parciales de tu voz utilizados en la síntesis'}
               </span>
             </div>
           </div>
@@ -536,9 +623,9 @@ export default function SlideLiveFormula() {
             gap: 10,
           }}>
             {[
-              { label: 'Activos', value: value, color: ACCENT },
-              { label: 'Restantes', value: Math.max(0, maxParciales - value), color: '#9ca3af' },
-              { label: 'Tracks totales', value: maxParciales, color: '#7c3aed' },
+              { label: 'Activos', value: isComplete ? maxParciales : value, color: isComplete ? SMS_PURPLE : ACCENT },
+              { label: 'Restantes', value: isComplete ? 0 : Math.max(0, maxParciales - value), color: '#9ca3af' },
+              { label: 'Tracks totales', value: maxParciales, color: SMS_PURPLE },
             ].map(({ label, value: v, color }) => (
               <div key={label} style={{
                 background: '#fff',
